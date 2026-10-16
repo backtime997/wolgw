@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>WOL / 关机网关</title>
+<style>
+  :root{--bg:#f5f7fa;--card:#fff;--line:#e5e8ee;--txt:#24292f;--mut:#8a919c;--acc:#1a73e8;--danger:#e0483e;--ok:#1e8e3e}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--txt);font:14px/1.6 -apple-system,"PingFang SC","Microsoft YaHei",sans-serif}
+  .wrap{max-width:1080px;margin:0 auto;padding:20px 16px 60px}
+  header{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:4px}
+  .dot{width:10px;height:10px;border-radius:50%;background:#c3c9d2;flex:none}
+  .dot.on{background:var(--ok);box-shadow:0 0 0 3px rgba(30,142,62,.15)}
+  h1{font-size:19px;font-weight:600}
+  .badge{background:#eef2f7;color:var(--mut);border-radius:9px;padding:2px 10px;font-size:12px}
+  .sub{color:var(--mut);font-size:12.5px;margin-bottom:14px}
+  .tabs{display:flex;gap:6px;border-bottom:2px solid var(--line);margin-bottom:16px}
+  .tab{appearance:none;border:none;background:none;padding:8px 18px;font-size:15px;color:var(--mut);cursor:pointer;border-radius:8px 8px 0 0;font-weight:500}
+  .tab.act{color:var(--acc);font-weight:600;box-shadow:inset 0 -2px 0 var(--acc)}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px 18px;margin-bottom:16px}
+  .card-h{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;gap:10px}
+  .card-h h2{font-size:15.5px;font-weight:600}
+  .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+  @media(max-width:760px){.grid{grid-template-columns:1fr}}
+  label{display:block;color:var(--mut);font-size:12.5px;margin-bottom:4px}
+  input,select{width:100%;border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-size:14px;background:#fbfcfe;color:var(--txt);outline:none}
+  input:focus,select:focus{border-color:var(--acc);background:#fff}
+  button{cursor:pointer;border:1px solid var(--line);background:#fff;border-radius:8px;padding:7px 16px;font-size:13.5px;color:var(--txt)}
+  button:disabled{opacity:.45;cursor:default}
+  .primary{background:var(--acc);border-color:var(--acc);color:#fff;font-weight:500}
+  .sm{padding:3.5px 10px;font-size:12.5px;border-radius:6px}
+  .danger{color:var(--danger);border-color:#f0d2d0}
+  table{width:100%;border-collapse:collapse}
+  th{color:var(--mut);font-size:12.5px;font-weight:500;text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);white-space:nowrap}
+  td{padding:9px 10px;border-bottom:1px solid #f0f2f5;vertical-align:middle}
+  tr:last-child td{border-bottom:none}
+  .mut{color:var(--mut)}
+  .mono{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12.5px}
+  .ops{white-space:nowrap;text-align:right}
+  .ops .sm{margin-left:6px}
+  .pager{display:flex;align-items:center;justify-content:center;gap:12px;margin-top:12px}
+  .pill{display:inline-block;border-radius:10px;padding:1px 10px;font-size:12px}
+  .pill.on{background:#e6f4ea;color:var(--ok)}
+  .pill.off{background:#fdecea;color:var(--danger)}
+  .empty{padding:18px;text-align:center;border:1px dashed var(--line);border-radius:10px}
+  /* 弹窗 */
+  .mask{position:fixed;inset:0;background:rgba(20,25,32,.45);display:none;align-items:flex-start;justify-content:center;z-index:50;overflow:auto;padding:40px 16px}
+  .mask.show{display:flex}
+  .modal{background:#fff;border-radius:14px;width:620px;max-width:100%;padding:20px 22px;box-shadow:0 18px 50px rgba(0,0,0,.2)}
+  .modal h3{font-size:16px;margin-bottom:14px}
+  .modal .grid{grid-template-columns:repeat(2,1fr)}
+  .pw{position:relative}
+  .pw input{padding-right:38px}
+  .pwbtn{position:absolute;right:6px;top:50%;transform:translateY(-50%);border:none;background:none;font-size:15px;padding:4px;color:var(--mut)}
+  .m-foot{display:flex;justify-content:flex-end;gap:10px;margin-top:16px}
+  /* 日志 */
+  .logbox{max-height:520px;overflow:auto;background:#fbfcfe;border:1px solid var(--line);border-radius:10px;padding:10px 12px;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12.5px}
+  .ln{display:flex;gap:10px;padding:1.5px 0;white-space:pre-wrap;word-break:break-all}
+  .lt{color:var(--mut);flex:none}
+  .lv{flex:none;font-size:11px;border-radius:5px;padding:0 7px;height:18px;line-height:18px}
+  .lv.info{background:#eef2f7;color:#5c6470}
+  .lv.debug{background:#fdf3e3;color:#b06e12}
+  .hint{color:var(--mut);font-size:12.5px;margin-top:10px}
+  #toast{position:fixed;left:50%;bottom:34px;transform:translateX(-50%);background:#24292f;color:#fff;padding:9px 18px;border-radius:9px;font-size:13.5px;opacity:0;transition:opacity .25s;z-index:99;pointer-events:none;max-width:86vw}
+  #toast.show{opacity:.95}
+
+  /* ========== 移动端（iPhone 等窄屏）========== */
+  @media (max-width:680px){
+    .wrap{padding:14px 12px calc(48px + env(safe-area-inset-bottom,0px))}
+    h1{font-size:17px}
+    .sub{margin-bottom:10px}
+    input,select{font-size:16px}            /* ≥16px：iOS 聚焦不自动放大 */
+    button,.tab{min-height:38px}
+    .sm{padding:7px 12px;font-size:13.5px;min-height:auto}
+    table,tbody,tr,td{display:block;width:auto}   /* 表格 → 卡片列表 */
+    thead{display:none}
+    tr{border:1px solid var(--line);border-radius:12px;background:#fff;margin-bottom:10px;padding:4px 14px;box-shadow:0 1px 3px rgba(15,23,42,.05)}
+    td{display:flex;justify-content:space-between;align-items:center;gap:14px;padding:9px 0;border-bottom:none;text-align:right}
+    td::before{content:attr(data-th);color:var(--mut);font-size:13px;flex:none}
+    tr>td:nth-child(2n+1){border-top:1px solid #f6f8fa}
+    tr>td:first-child{display:none}                       /* 隐藏序号列 */
+    td,td .mono{text-wrap:wrap;word-break:break-all}
+    td.ops{flex-wrap:wrap;justify-content:flex-end;gap:8px;padding-top:10px;border-top:1px dashed var(--line)}
+    td.ops .sm{margin-left:0!important;margin-right:0}
+    /* 弹窗 → 底部抽屉 */
+    .mask{align-items:flex-end;padding:0}
+    .modal{width:100%;border-radius:14px 14px 0 0;max-height:92vh;overflow:auto;padding:16px 16px calc(14px + env(safe-area-inset-bottom,0px))}
+    .modal .grid{grid-template-columns:1fr!important}
+    .m-foot button{flex:1;min-height:44px;font-size:15px}
+    /* 日志 */
+    .logbox{max-height:56vh;font-size:12px;padding:8px 10px}
+    .ln{gap:7px}
+    #toast{bottom:max(26px, calc(env(safe-area-inset-bottom,0px) + 16px));font-size:13px;max-width:90vw}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <span class="dot" id="dot"></span>
+    <h1>WOL / 关机网关</h1>
+    <span class="badge" id="devcount">0 台设备</span>
+    <span class="badge" id="hb">心跳 --:--:--</span>
+  </header>
+  <div class="sub">bemfa 多设备网关 · 纯接收云端指令(on/off) · <span id="server"></span></div>
+
+  <div class="tabs">
+    <button class="tab act" id="tabCfg" onclick="switchTab('cfg')">配置</button>
+    <button class="tab" id="tabLog" onclick="switchTab('log')">日志</button>
+  </div>
+
+  <!-- ================= 配置 ================= -->
+  <div id="pageCfg">
+    <div class="card">
+      <div class="card-h">
+        <h2>巴法云配置</h2>
+        <button class="primary" onclick="saveBemfa()">保存</button>
+      </div>
+      <div class="grid">
+        <div><label>用户私钥 (uid / Client ID)</label><input id="bemfaUid" placeholder="bemfa 控制台 → 创建设备 → 私钥"></div>
+        <div><label>服务器</label><input id="bemfaHost" placeholder="bemfa.com"></div>
+        <div><label>端口</label><input id="bemfaPort" type="number" placeholder="8344"></div>
+      </div>
+      <div class="hint">说明：所有设备共用一个 uid 接入 bemfa，各自用独立 topic 接收指令。指令主题 = 设备 topic（如 <code>devA</code> / <code>devB</code>）。</div>
+    </div>
+
+    <div class="card">
+      <div class="card-h">
+        <h2>设备列表</h2>
+        <button class="primary" onclick="openAdd()">＋ 添加设备</button>
+      </div>
+      <table>
+        <thead>
+          <tr><th>#</th><th>名称</th><th>topic</th><th>目标 IP</th><th>MAC</th><th>设备状态</th><th style="text-align:right">操作</th></tr>
+        </thead>
+        <tbody id="tbody"></tbody>
+      </table>
+      <div class="pager" id="pager"></div>
+    </div>
+  </div>
+
+  <!-- ================= 日志 ================= -->
+  <div id="pageLog" style="display:none">
+    <div class="card">
+      <div class="card-h">
+        <h2>运行日志</h2>
+        <div style="display:flex;align-items:center;gap:8px">
+          <span class="mut" style="font-size:13px">日志等级</span>
+          <select id="llSel" style="width:auto" onchange="setLogLevel(this.value)">
+            <option value="info">info</option>
+            <option value="debug">debug（输出心跳等）</option>
+          </select>
+        </div>
+      </div>
+      <div class="logbox" id="logbox"></div>
+      <div class="hint">等级保存到配置文件，重启后依然生效。切到 debug 后可看到心跳、cmd=9 轮询等调试日志。</div>
+    </div>
+  </div>
+</div>
+
+<!-- 设备 添加/编辑 弹窗 -->
+<div class="mask" id="mask" onclick="if(event.target===this&&pressOnMask)closeModal()">
+  <div class="modal">
+    <h3 id="mTitle">添加设备</h3>
+    <div class="grid">
+      <div><label>设备名称</label><input id="f_name" placeholder="如 客厅主机"></div>
+      <div><label>topic（bemfa 指令主题，需唯一）</label><input id="f_topic" placeholder="如 devA"></div>
+      <div><label>目标 IP（WOL / SSH 主机）</label><input id="f_ip" placeholder="192.168.1.50"></div>
+      <div><label>WOL MAC 地址</label><input id="f_mac" placeholder="AA:BB:CC:DD:EE:FF"></div>
+      <div><label>广播地址（默认 255.255.255.255）</label><input id="f_brd" placeholder="255.255.255.255"></div>
+      <div><label>SSH 用户</label><input id="f_user" placeholder="root"></div>
+      <div><label>SSH 端口</label><input id="f_port" type="number" placeholder="22"></div>
+      <div><label>SSH 密码</label>
+        <div class="pw">
+          <input id="f_pwd" type="password" placeholder="关机的 SSH 密码">
+          <button type="button" class="pwbtn" onclick="togglePw()" id="pwBtn" title="显示/隐藏">👁</button>
+        </div>
+      </div>
+      <div style="grid-column:1/-1"><label>关机命令</label><input id="f_cmd" placeholder="systemctl poweroff"></div>
+    </div>
+    <div class="m-foot">
+      <button onclick="closeModal()">取消</button>
+      <button class="primary" onclick="saveModal()">保存设备</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+const $=id=>document.getElementById(id);
+const PAGE_SIZE=10;
+let state={config:{devices:[]},devices:[]};
+let lastCfgJson='', page=1, modalIdx=-1, modalTopic=''; // modalIdx: -1 关闭, -2 新增, 其他为编辑下标
+let logs=[];
+/* 遮罩关闭保护：仅当“按下”和“点下”都在遮罩本身才关闭（防止弹窗内拖选文字时误关） */
+let pressOnMask=false;
+$('mask').addEventListener('pointerdown',e=>{pressOnMask=(e.target===$('mask'));});
+
+function esc(s){return (s==null?'':String(s)).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+function toast(m){const t=$('toast');t.textContent=m;t.classList.add('show');clearTimeout(t._h);t._h=setTimeout(()=>t.classList.remove('show'),2600)}
+
+/* ---------- tab ---------- */
+function switchTab(n){
+  $('pageCfg').style.display = n==='cfg'?'':'none';
+  $('pageLog').style.display = n==='log'?'':'none';
+  $('tabCfg').classList.toggle('act',n==='cfg');
+  $('tabLog').classList.toggle('act',n==='log');
+  if(n==='log')renderLogs();
+}
+
+/* ---------- 巴法云配置 ---------- */
+function saveBemfa(){
+  const body={
+    bemfaUid:$('bemfaUid').value.trim(),
+    bemfaHost:$('bemfaHost').value.trim()||'bemfa.com',
+    bemfaPort:+$('bemfaPort').value||8344
+  };
+  fetch('/api/bemfa',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})
+    .then(r=>r.json()).then(j=>{
+      toast(j.ok?'巴法云配置已保存':(j.error||'保存失败'));
+      if(j.ok)refresh();
+    }).catch(()=>toast('保存失败：网络错误'));
+}
+
+/* ---------- 设备表格（分页） ---------- */
+function renderTable(){
+  const devs=(state.config&&state.config.devices)||[];
+  $('devcount').textContent=devs.length+' 台设备';
+  const pages=Math.max(1,Math.ceil(devs.length/PAGE_SIZE));
+  if(page>pages)page=pages;
+  const start=(page-1)*PAGE_SIZE;
+  const slice=devs.slice(start,start+PAGE_SIZE);
+  const rts=state.devices||[];
+  $('tbody').innerHTML=slice.map((d,i)=>{
+    const gi=start+i;
+    const r=rts.find(x=>x.topic===d.topic)||{};
+    // 设备状态：仅 开机/关机（网关 ping 目标 IP 判定）
+    const st=r.online===true?'<span class="pill on">开机</span>':r.online===false?'<span class="pill off">关机</span>':'<span class="mut">未知</span>';
+    return `<tr>
+      <td data-th="序号" class="mut">${gi+1}</td>
+      <td data-th="名称">${esc(d.name||'—')}</td>
+      <td data-th="topic" class="mono">${esc(d.topic||'')}</td>
+      <td data-th="目标 IP" class="mono">${esc(d.targetIp||'')}</td>
+      <td data-th="MAC" class="mono mut">${esc(d.wolMac||'')}</td>
+      <td data-th="状态" style="min-width:90px">${st}</td>
+      <td data-th="操作" class="ops">
+        <button class="sm" onclick="doWake(${gi})">唤醒</button>
+        <button class="sm" onclick="doShutdown(${gi})">关机</button>
+        <button class="sm" onclick="openEdit(${gi})">编辑</button>
+        <button class="sm danger" onclick="delDev(${gi})">删除</button>
+      </td>
+    </tr>`;
+  }).join('') || '<tr><td colspan="7"><div class="empty">暂无设备，点击右上角「＋ 添加设备」</div></td></tr>';
+  $('pager').innerHTML=`
+    <button class="sm" ${page<=1?'disabled':''} onclick="goPage(${page-1})">‹ 上一页</button>
+    <span class="mut" style="font-size:12.5px">第 ${page} / ${pages} 页 · 共 ${devs.length} 台</span>
+    <button class="sm" ${page>=pages?'disabled':''} onclick="goPage(${page+1})">下一页 ›</button>`;
+}
+function goPage(p){page=p;renderTable()}
+
+/* ---------- 设备弹窗 ---------- */
+function fillForm(d){
+  d=d||{};
+  $('f_name').value=d.name||'';
+  $('f_topic').value=d.topic||'';
+  $('f_ip').value=d.targetIp||'';
+  $('f_mac').value=d.wolMac||'';
+  $('f_brd').value=d.broadcast||'';
+  $('f_user').value=d.sshUser||'';
+  $('f_port').value=d.sshPort||22;
+  // 密码：直接预填脱敏值（密文显示）；点 👁 取真实密码明文；保存时后端识别脱敏串 → 保持原密码
+  $('f_pwd').value=d.sshPassword||'';
+  $('f_pwd').placeholder='SSH 密码';
+  modalTopic=d.topic||'';
+  setPwdType('password');
+  $('f_cmd').value=d.shutdownCmd||'systemctl poweroff';
+}
+function openAdd(){
+  modalIdx=-2;
+  $('mTitle').textContent='添加设备';
+  const n=((state.config.devices)||[]).length+1;
+  fillForm({name:'设备'+n,topic:'',sshUser:'root',shutdownCmd:'systemctl poweroff',broadcast:'255.255.255.255'});
+  $('mask').classList.add('show');
+  $('f_topic').focus();
+}
+function openEdit(i){
+  const d=(state.config.devices||[])[i];
+  if(!d)return;
+  modalIdx=i;
+  $('mTitle').textContent='编辑设备：'+(d.name||d.topic);
+  fillForm(d);
+  $('mask').classList.add('show');
+}
+function closeModal(){$('mask').classList.remove('show');modalIdx=-1}
+
+function togglePw(){
+  const inp=$('f_pwd');
+  if(inp.type!=='password'){
+    setPwdType('password');
+    return;
+  }
+  // 切换明文：向服务端取该设备的真实密码
+  if(!modalTopic){
+    setPwdType('text');
+    return;
+  }
+  fetch('/api/pwd?topic='+encodeURIComponent(modalTopic))
+    .then(r=>r.json())
+    .then(j=>{
+      if(j.password) inp.value=j.password;
+      setPwdType('text');
+    })
+    .catch(()=>{toast('获取明文失败');setPwdType('text');});
+}
+function setPwdType(t){
+  $('f_pwd').type=t;
+  $('pwBtn').textContent=t==='password'?'👁':'🙈';
+}
+
+function saveModal(){
+  const devs=(state.config.devices||[]).slice();
+  // 完整 Device（Go JSON 字段名）；sshHost 留空 = 与目标 IP 相同
+  const d={
+    name:$('f_name').value.trim(),
+    topic:$('f_topic').value.trim(),
+    targetIp:$('f_ip').value.trim(),
+    wolMac:$('f_mac').value.trim().toUpperCase(),
+    broadcast:$('f_brd').value.trim(),
+    sshHost:'',
+    sshUser:$('f_user').value.trim()||'root',
+    sshPassword:$('f_pwd').value,
+    sshPort:+$('f_port').value||22,
+    shutdownCmd:$('f_cmd').value.trim()||'systemctl poweroff'
+  };
+  if(modalIdx===-2)devs.push(d); else devs[modalIdx]=d;
+  fetch('/api/devices',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({devices:devs})})
+    .then(r=>r.json()).then(j=>{
+      toast(j.ok?'设备已保存':(j.error||'保存失败'));
+      if(j.ok){closeModal();lastCfgJson='';refresh();}
+    }).catch(()=>toast('保存失败：网络错误'));
+}
+
+function delDev(i){
+  const d=(state.config.devices||[])[i];
+  if(!d)return;
+  if(!confirm(`确定删除设备「${d.name||d.topic}」？此操作不可恢复。`))return;
+  const devs=(state.config.devices||[]).slice();
+  devs.splice(i,1);
+  fetch('/api/devices',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({devices:devs})})
+    .then(r=>r.json()).then(j=>{
+      toast(j.ok?'设备已删除':(j.error||'删除失败'));
+      if(j.ok){lastCfgJson='';refresh();}
+    }).catch(()=>toast('删除失败：网络错误'));
+}
+
+/* ---------- 唤醒 / 关机 ---------- */
+function doWake(i){
+  const d=(state.config.devices||[])[i];
+  if(!d||!d.topic){toast('请先为该设备填写 topic 并保存');return}
+  if(!confirm(`唤醒设备「${d.name||d.topic}」？`))return;
+  fetch('/api/wake',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({topic:d.topic})})
+    .then(r=>r.json()).then(j=>{toast(j.ok?j.result:(j.error||'唤醒失败'));refresh();});
+}
+function doShutdown(i){
+  const d=(state.config.devices||[])[i];
+  if(!d||!d.topic){toast('请先为该设备填写 topic 并保存');return}
+  if(!confirm(`关机设备「${d.name||d.topic}」？请确认目标机器可以安全断电。`))return;
+  fetch('/api/shutdown',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({topic:d.topic})})
+    .then(r=>r.json()).then(j=>{toast(j.ok?j.result:(j.error||'关机失败'));refresh();});
+}
+
+/* ---------- 日志 ---------- */
+function setLogLevel(v){
+  fetch('/api/loglevel',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({level:v})})
+    .then(r=>r.json()).then(j=>{toast(j.ok?'日志等级已切换（已持久化）':(j.error||'切换失败'));if(j.ok)refresh();})
+    .catch(()=>toast('切换失败：网络错误'));
+}
+function renderLogs(){
+  const box=$('logbox');
+  const atBottom=box.scrollHeight-box.scrollTop-box.clientHeight<40;
+  box.innerHTML=logs.map(l=>
+    `<div class="ln"><span class="lt">${esc(l.time)}</span><span class="lv ${l.level}">${l.level}</span><span>${esc(l.msg)}</span></div>`
+  ).join('')||'<div class="ln mut">暂无日志</div>';
+  if(atBottom)box.scrollTop=box.scrollHeight;
+}
+
+/* ---------- 刷新 ---------- */
+async function refresh(){
+  try{
+    const [s,l]=await Promise.all([
+      fetch('/api/status').then(r=>r.json()),
+      fetch('/api/logs').then(r=>r.json())
+    ]);
+    state=s;
+    logs=(l.log||[]).slice(-300);
+    $('dot').classList.toggle('on',!!s.connected);
+    $('server').textContent=s.server||'';
+    $('hb').textContent=s.connected?(s.lastHeartbeat?('心跳 '+s.lastHeartbeat):'心跳 等待中…'):'心跳 未连接';
+    const cj=JSON.stringify(s.config||{});
+    if(cj!==lastCfgJson){
+      lastCfgJson=cj;
+      const c=s.config||{};
+      $('bemfaUid').value=c.bemfaUid||'';
+      $('bemfaHost').value=c.bemfaHost||'';
+      $('bemfaPort').value=c.bemfaPort||8344;
+      $('llSel').value=c.logLevel||'info';
+    }
+    renderTable();
+    if($('pageLog').style.display!=='none')renderLogs();
+  }catch(e){}
+}
+refresh();
+setInterval(refresh,3000);
+document.addEventListener('keydown',e=>{if(e.key==='Escape')closeModal()});
+</script>
+</body>
+</html>

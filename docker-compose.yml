@@ -1,0 +1,38 @@
+# =============================================================
+# wolgw — bemfa WOL 唤醒 / SSH 关机网关
+#
+# 用法（x86 宿主机上）：
+#   1. 在本目录的 shell/ 里放好 3 个文件：
+#        shell/wolgw        # 静态二进制（linux/amd64）
+#        shell/start.sh     # 启动脚本
+#        shell/config.json  # 配置（可先不放，启动后在 Web 页面填）
+#   2. docker compose up -d
+#   3. 浏览器打开 http://<宿主机IP>
+#
+# 说明：
+#   - build: . 从本仓库 Dockerfile 构建（纯 Go 单二进制，无 Python 依赖）；
+#     若要复用 iKuai 上的旧镜像，把 build/image 两行改回 image: bemfa-wol:local 即可
+#   - entrypoint 覆盖：给 bind 挂载进来的文件补执行权限后再启动 start.sh
+#   - network_mode: host  → WOL 魔术包是二层广播，必须 host 网络才能到局域网
+#   - shell/ 目录即容器内 /shell，日志 wolgw.log 会写回宿主机此目录
+# =============================================================
+services:
+  wolgw:
+    build: .                    # 从本仓库 Dockerfile 构建（如需复用旧镜像，删掉此行走原 image）
+    image: wolgw:local
+    container_name: wolgw
+    network_mode: host
+    restart: unless-stopped
+    volumes:
+      - ./shell:/shell
+    # 覆盖 Dockerfile 的 ENTRYPOINT/CMD：
+    #   chmod +x 补上上传文件丢失的执行位 → 启动 start.sh
+    entrypoint: ["/bin/bash", "-c"]
+    command:
+      - "chmod +x /shell/wolgw /shell/start.sh 2>/dev/null; exec /bin/bash /shell/start.sh"
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c 'exec 3<>/dev/tcp/127.0.0.1/80'"]
+      interval: 15s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
